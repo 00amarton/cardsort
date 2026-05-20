@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Card Sorting</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:system-ui,sans-serif;overflow:hidden}
+#root{display:grid;grid-template-rows:50px 1fr;height:100vh}
+#toolbar{display:flex;align-items:center;gap:6px;padding:0 10px;background:#fff;border-bottom:1px solid #e0e0e0}
+#session-title{flex:1;font-size:.88rem;font-weight:700;color:#333;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.prog-wrap{display:flex;align-items:center;gap:4px;font-size:.72rem;color:#999;flex-shrink:0}
+.prog-bg{width:52px;height:5px;background:#eee;border-radius:3px;overflow:hidden}
+.prog-fill{height:100%;background:#43a047;border-radius:3px;transition:width .2s}
+#btn-submit{padding:.32rem .65rem;background:#43a047;color:#fff;border:none;border-radius:6px;font-size:.78rem;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0}
+#btn-submit:disabled{background:#9e9e9e;cursor:default}
+#btn-add-cat{padding:.28rem .55rem;background:#f5f5f2;color:#555;border:1px solid #ddd;border-radius:6px;font-size:.75rem;font-weight:600;cursor:pointer;flex-shrink:0}
+#main{display:grid;grid-template-columns:185px 1fr;overflow:hidden;height:100%}
+#unsorted-panel{background:#f0ede5;border-right:1px solid #e0ddd5;overflow-y:auto;padding:8px 5px}
+#panel-label{font-size:.64rem;text-transform:uppercase;letter-spacing:.07em;color:#aaa;padding:0 3px;margin-bottom:6px;display:block}
+#unsorted-list{min-height:60px}
+#cats-area{overflow-y:auto;padding:7px}
+#cats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:7px;align-content:start}
+.cat-box{background:#fff;border:1px solid #e0e0e0;border-radius:9px;padding:7px;min-height:100px}
+.cat-name{font-size:.76rem;font-weight:700;border:none;border-bottom:1px solid #c5cae9;width:100%;padding:3px 4px;margin-bottom:5px;font-family:inherit;color:#333;background:transparent;outline:none}
+.cat-name::placeholder{font-weight:400;color:#ccc}
+.cat-name:disabled{color:#333;cursor:default}
+.cat-list{min-height:48px}
+.cs-card{background:#ffe566;border:1px solid #c8a800;border-radius:5px;padding:8px 9px;margin-bottom:5px;font-size:.82rem;line-height:1.35;cursor:grab;user-select:none}
+.cs-card:active{cursor:grabbing}
+.sortable-ghost{opacity:.3}
+.sortable-chosen{box-shadow:0 3px 12px rgba(0,0,0,.22)}
+#overlay{display:flex;position:fixed;inset:0;z-index:100;background:rgba(255,255,255,.97);justify-content:center;align-items:center;flex-direction:column;text-align:center;gap:1rem;padding:2rem}
+#overlay.hidden{display:none}
+#ov-icon{font-size:3rem}
+#ov-title{font-size:1.35rem;font-weight:700;color:#222}
+#ov-body{font-size:.9rem;color:#666;max-width:340px}
+.spinner{width:34px;height:34px;border:3px solid #ddd;border-top-color:#3f51b5;border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Mobile via JS class */
+body.mob #root{grid-template-rows:auto 1fr}
+body.mob #toolbar{flex-wrap:wrap;padding:6px 10px;gap:5px;height:auto}
+body.mob #session-title{font-size:.8rem;width:100%;order:0}
+body.mob .prog-wrap{order:1}
+body.mob #btn-add-cat{order:2}
+body.mob #btn-submit{order:3}
+body.mob #main{grid-template-columns:1fr;grid-template-rows:auto 1fr}
+body.mob #unsorted-panel{border-right:none;border-bottom:2px solid #d5cfc5;padding:6px 8px;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch}
+body.mob #unsorted-list{display:flex;flex-direction:row;flex-wrap:nowrap;gap:6px;align-items:flex-start;min-height:60px}
+body.mob #unsorted-list .cs-card{flex-shrink:0;width:120px;margin-bottom:0;font-size:.79rem}
+body.mob #cats-area{padding:6px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+body.mob #cats-grid{grid-template-columns:repeat(2,1fr);gap:6px}
+body.mob .cat-box{min-height:80px;padding:6px}
+body.mob.xs #cats-grid{grid-template-columns:1fr}
+body.mob.xs #unsorted-list .cs-card{width:100px}
+</style>
+</head>
+<body>
+
+<div id="root">
+  <div id="toolbar">
+    <span id="session-title">Card Sorting</span>
+    <div class="prog-wrap" id="prog-wrap" style="display:none">
+      <div class="prog-bg"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
+      <span id="prog-text"></span>
+    </div>
+    <button id="btn-add-cat" onclick="addCategory('',true)">+ Categoria</button>
+    <button id="btn-submit" onclick="doSubmit()">Invia risultato</button>
+  </div>
+  <div id="main">
+    <div id="unsorted-panel">
+      <div id="panel-label">Da ordinare</div>
+      <div id="unsorted-list"></div>
+    </div>
+    <div id="cats-area"><div id="cats-grid"></div></div>
+  </div>
+</div>
+
+<div id="overlay">
+  <div class="spinner" id="ov-spin"></div>
+  <div id="ov-icon"  style="display:none"></div>
+  <div id="ov-title" style="display:none"></div>
+  <div id="ov-body"  style="display:none"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
+<script src="config.js"></script>
+<script src="api.js"></script>
+<script>
+// Responsive via JS
+function applyResp() {
+  var w = window.innerWidth;
+  document.body.classList.toggle('mob', w <= 600);
+  document.body.classList.toggle('xs',  w <= 360);
+}
+applyResp();
+window.addEventListener('resize', applyResp);
+
+// Leggi session ID dall'URL (qui window.location funziona, siamo su GitHub Pages)
+var SESSION_ID    = '';
+var PARTICIPANT_ID = 'anon_' + Math.random().toString(36).slice(2,7);
+var totalCards    = 0;
+var currentConfig = null;
+
+try {
+  var sp  = new URLSearchParams(window.location.search);
+  SESSION_ID = sp.get('session') || '';
+  var pid = sp.get('pid');
+  if (pid) { PARTICIPANT_ID = pid; }
+} catch(e) {}
+
+if (!SESSION_ID) {
+  showOverlay('nope', 'Link non valido', 'Parametro session mancante.');
+} else {
+  apiGetSession(SESSION_ID, function(res) {
+    if (!res.ok || !res.session) {
+      showOverlay('nope', 'Sessione non trovata', 'La sessione ' + SESSION_ID + ' non esiste.');
+    } else {
+      currentConfig = res.session;
+      initSort(res.session);
+    }
+  });
+}
+
+function initSort(conf) {
+  document.title = conf.title + ' - Card Sorting';
+  document.getElementById('session-title').textContent = conf.title;
+  if (!conf.edit) { document.getElementById('btn-add-cat').style.display='none'; }
+
+  var cards = conf.cards.slice();
+  if (conf.randomize) { cards.sort(function(){return Math.random()-.5;}); }
+  totalCards = cards.length;
+
+  var ul = document.getElementById('unsorted-list');
+  for (var i=0; i<cards.length; i++) { ul.appendChild(mkCard(cards[i])); }
+  new Sortable(ul, {group:'cs',animation:120,ghostClass:'sortable-ghost',chosenClass:'sortable-chosen',onEnd:updateProgress});
+
+  var initCats = (conf.cats && conf.cats.length) ? conf.cats : ['','',''];
+  for (var c=0; c<initCats.length; c++) { addCategory(initCats[c], conf.edit); }
+
+  if (totalCards > 0) { document.getElementById('prog-wrap').style.display='flex'; updateProgress(); }
+  hideOverlay();
+}
+
+function mkCard(text) {
+  var el = document.createElement('div');
+  el.className='cs-card'; el.setAttribute('data-card',text); el.textContent=text;
+  return el;
+}
+
+function addCategory(name, editEnabled) {
+  var allow = (editEnabled !== false);
+  var box   = document.createElement('div'); box.className='cat-box';
+  var inp   = document.createElement('input');
+  inp.className='cat-name'; inp.type='text';
+  inp.placeholder = allow ? 'Nome categoria' : '';
+  inp.value       = name || '';
+  inp.disabled    = !allow;
+  if (!allow && !name) { inp.style.opacity='0'; }
+  var list = document.createElement('div'); list.className='cat-list';
+  box.appendChild(inp); box.appendChild(list);
+  document.getElementById('cats-grid').appendChild(box);
+  new Sortable(list,{group:'cs',animation:120,ghostClass:'sortable-ghost',chosenClass:'sortable-chosen',onEnd:updateProgress});
+}
+
+function updateProgress() {
+  var un   = document.querySelectorAll('#unsorted-list .cs-card').length;
+  var done = totalCards - un;
+  var pct  = totalCards > 0 ? Math.round(done/totalCards*100) : 0;
+  document.getElementById('prog-fill').style.width = pct+'%';
+  document.getElementById('prog-text').textContent  = done+'/'+totalCards;
+}
+
+function collectCategories() {
+  var result={}, untitled=0;
+  var boxes = document.querySelectorAll('#cats-grid .cat-box');
+  for (var b=0; b<boxes.length; b++) {
+    var inp  = boxes[b].querySelector('.cat-name');
+    var name = inp ? inp.value.trim() : '';
+    if (!name) { untitled++; name=(untitled===1)?'(Senza nome)':'(Senza nome '+untitled+')'; }
+    var els  = boxes[b].querySelectorAll('[data-card]');
+    var items=[];
+    for (var x=0; x<els.length; x++) { items.push(els[x].getAttribute('data-card')); }
+    result[name]=items;
+  }
+  var unEls = document.querySelectorAll('#unsorted-list [data-card]');
+  if (unEls.length > 0) {
+    var arr=[];
+    for (var u=0; u<unEls.length; u++) { arr.push(unEls[u].getAttribute('data-card')); }
+    result['(Non categorizzate)']=arr;
+  }
+  return result;
+}
+
+function doSubmit() {
+  var payload = {
+    sessionId     : SESSION_ID,
+    participantId : PARTICIPANT_ID,
+    sessionTitle  : currentConfig ? currentConfig.title : '',
+    timestamp     : new Date().toISOString(),
+    categories    : collectCategories()
+  };
+  var btn = document.getElementById('btn-submit');
+  btn.disabled=true; btn.textContent='Invio...';
+  apiSubmitResult(payload, function(res) {
+    showOverlay('ok','Grazie!','Il tuo card sorting e stato inviato. Puoi chiudere questa pagina.');
+  });
+}
+
+function showOverlay(type,title,body) {
+  document.getElementById('ov-spin').style.display='none';
+  document.getElementById('ov-icon').textContent  = (type==='ok') ? '' : '';
+  document.getElementById('ov-title').textContent = title;
+  document.getElementById('ov-body').textContent  = body;
+  document.getElementById('ov-icon').style.display ='';
+  document.getElementById('ov-title').style.display='';
+  document.getElementById('ov-body').style.display ='';
+  document.getElementById('overlay').classList.remove('hidden');
+}
+function hideOverlay() { document.getElementById('overlay').classList.add('hidden'); }
+</script>
+</body>
+</html>
