@@ -5,4 +5,4 @@
 // incolla qui l'URL che termina in /exec
 // ============================================================
 
-var GAS_URL = 'https://script.google.com/macros/s/AKfycbwphWfDXLR6ILPfnehjh50URVAuRoR2R6rvxCJwByZqkgjwMu6PBzHjZmpaXhWGIROE1g/exec';
+var GAS_URL = 'https://script.google.com/macros/s/AKfycbwgg2axQhj9d-9edXRcUJa5KoPTFAm06UI1hEblx31H4RfEfvKHjCyq1GxSllh0hWxn/exec';
